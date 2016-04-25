@@ -52,7 +52,7 @@ func main() {
 	downloadCmd.String("language", funimation.Subbed, "either `sub or dub`")
 	downloadCmd.String("out", "", "`file` save location")
 	downloadCmd.Bool("mock", false, "do everything normally but don't download the video")
-	//downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
+	downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
 	downloadCmd.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: funimation download [options] <show> <episode>")
 		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show> <episode-num>")
@@ -181,6 +181,7 @@ func doDownload(cmd *flag.FlagSet) {
 	language := funimation.EpisodeLanguage(cmd.Lookup("language").Value.(flag.Getter).Get().(string))
 	mock := cmd.Lookup("mock").Value.(flag.Getter).Get().(bool)
 	fname := cmd.Lookup("out").Value.(flag.Getter).Get().(string)
+	threads := cmd.Lookup("threads").Value.(flag.Getter).Get().(int)
 
 	// default to subbed
 	if language != funimation.Subbed && language != funimation.Dubbed {
@@ -234,7 +235,7 @@ func doDownload(cmd *flag.FlagSet) {
 	}
 
 	if fname == "" {
-		fname = fmt.Sprintf("s%de%v - %s [%s][%s].mp4", ep.SeasonNumber(), ep.EpisodeNumber(), ep.Title(), bitrateToQuality(bitrate), language)
+		fname = fmt.Sprintf("s%de%v - %s [%s][%s]", ep.SeasonNumber(), ep.EpisodeNumber(), ep.Title(), bitrateToQuality(bitrate), language)
 	}
 
 	// remove characters that are not allowed in filenames
@@ -253,69 +254,60 @@ func doDownload(cmd *flag.FlagSet) {
 	if mock {
 		fmt.Println("Received mock flag, not downloading...")
 	} else {
-		f, err := os.Create(fname)
-		if err != nil {
-			log.Fatal("file create: ", err)
-		}
-
 		bytesStrLen := len(humanize.Comma(videoSize))
 
 		lastTime := time.Now()
 		var rate float64 = 0
 		var bytesSinceLastTime int64 = 0
-		dst := &writerMiddleware{
-			Writer: f,
-			Func: func(bytes int) {
-				progress += int64(bytes)
-				bytesSinceLastTime += int64(bytes)
+		onBytesWritten := func(bytes int) {
+			progress += int64(bytes)
+			bytesSinceLastTime += int64(bytes)
 
-				percent := float32(progress) / float32(videoSize)
-				newTime := time.Now()
-				timeDiff := newTime.Sub(lastTime)
-				if secs := timeDiff.Seconds(); secs >= 0.5 {
-					rate = float64(bytesSinceLastTime) / secs
-					lastTime = newTime
-					bytesSinceLastTime = 0
-				}
+			percent := float32(progress) / float32(videoSize)
+			newTime := time.Now()
+			timeDiff := newTime.Sub(lastTime)
+			if secs := timeDiff.Seconds(); secs >= 0.5 {
+				rate = float64(bytesSinceLastTime) / secs
+				lastTime = newTime
+				bytesSinceLastTime = 0
+			}
 
-				percentStr := fmt.Sprintf("%.2f", percent * float32(100))
-				for ; len(percentStr) < 6; {
-					percentStr = " " + percentStr
-				}
+			percentStr := fmt.Sprintf("%.2f", percent * float32(100))
+			for ; len(percentStr) < 6; {
+				percentStr = " " + percentStr
+			}
 
-				progBar := "["
-				progBarLen := 30
-				for i := 0; i < progBarLen; i++ {
-					if float32(i) < float32(progBarLen) * percent {
-						if progBar[len(progBar) - 1] == byte('>') {
-							progBar = progBar[:len(progBar) - 1] + "="
-						}
-						progBar += ">"
-					} else {
-						progBar += " "
+			progBar := "["
+			progBarLen := 30
+			for i := 0; i < progBarLen; i++ {
+				if float32(i) < float32(progBarLen) * percent {
+					if progBar[len(progBar) - 1] == byte('>') {
+						progBar = progBar[:len(progBar) - 1] + "="
 					}
+					progBar += ">"
+				} else {
+					progBar += " "
 				}
-				progBar += "]"
+			}
+			progBar += "]"
 
-				bytesStr := humanize.Comma(progress)
-				for ; len(bytesStr) < bytesStrLen; {
-					bytesStr = " " + bytesStr
-				}
+			bytesStr := humanize.Comma(progress)
+			for ; len(bytesStr) < bytesStrLen; {
+				bytesStr = " " + bytesStr
+			}
 
-				rateStr := humanize.Bytes(uint64(rate))
-				for ; len(rateStr) < 10; {
-					rateStr = " " + rateStr
-				}
+			rateStr := humanize.Bytes(uint64(rate))
+			for ; len(rateStr) < 10; {
+				rateStr = " " + rateStr
+			}
 
-				fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
-			},
+			fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
 		}
 
-		if _, err := stream.Download(dst); err != nil {
+		if _, err := stream.Download(fname, threads, onBytesWritten); err != nil {
 			fmt.Println()
 			log.Fatal("download: ", err)
 		}
-		f.Close()
 		fmt.Println()
 	}
 	endTime := time.Now()

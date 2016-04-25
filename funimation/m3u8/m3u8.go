@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"fmt"
 	"strings"
-	"io"
 )
 
 const extInfPrefix = "#EXTINF:"
@@ -70,20 +69,6 @@ func New(url string) (*M3u8, error) {
 	res.Body.Close()
 
 	return ret, nil
-}
-
-func (s *M3u8) Download(w io.Writer) (int64, error) {
-	var totalSize int64
-	for _, frag := range s.frags {
-		size, err := frag.Save(w)
-		if err != nil {
-			return 0, err
-		}
-
-		totalSize += size
-	}
-
-	return totalSize, nil
 }
 
 func (s *M3u8) GetTotalSize() (int64, error) {
