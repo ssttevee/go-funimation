@@ -35,7 +35,7 @@ func (d *Downloader) Download(destFileName string, threads int) (int64, error) {
 	os.Mkdir(tempDir, os.ModeDir)
 
 	fragCount := d.NumFragments()
-	fragmentFiles := make([]*os.File, fragCount)
+	fragmentPaths := make([]string, fragCount)
 	jobsChan := make(chan dlJob, fragCount)
 	errsChan := make(chan error)
 
@@ -48,15 +48,10 @@ func (d *Downloader) Download(destFileName string, threads int) (int64, error) {
 				if finfo, err := os.Stat(fpath); err == nil {
 					if finfo.Size() == job.byteEnd - job.byteStart + 1 {
 						// assume same size is synonymous with same file
-						f, err := os.Open(fpath)
-						if err != nil {
-							errsChan <- err
-							return
-						}
 
 						d.OnBytesReceived(int(d.FragmentSize))
 
-						fragmentFiles[job.index] = f
+						fragmentPaths[job.index] = fpath
 						errsChan <- nil
 						continue
 					}
@@ -94,7 +89,9 @@ func (d *Downloader) Download(destFileName string, threads int) (int64, error) {
 					return
 				}
 
-				fragmentFiles[job.index] = f
+				f.Close()
+
+				fragmentPaths[job.index] = f.Name()
 				errsChan <- nil
 			}
 		}()
@@ -113,7 +110,7 @@ func (d *Downloader) Download(destFileName string, threads int) (int64, error) {
 		jobsChan <- job
 	}
 
-	for range fragmentFiles {
+	for range fragmentPaths {
 		if err := <-errsChan; err != nil {
 			return 0, err
 		}
@@ -125,7 +122,12 @@ func (d *Downloader) Download(destFileName string, threads int) (int64, error) {
 	}
 
 	totalBytesCopied := int64(0)
-	for _, f := range fragmentFiles {
+	for _, fname := range fragmentPaths {
+		f, err := os.Open(fname)
+		if err != nil {
+			return 0, err
+		}
+
 		if copied, err := io.Copy(out, f); err != nil {
 			return 0, err
 		} else {
