@@ -299,15 +299,17 @@ func formatPlaylistItemContainer(m map[string]interface{}) (playlistItem, error)
 	ret := playlistItemContainer{}
 
 	ret.items = make([]playlistItem, 0)
-	for _, item := range m["items"].([]interface{}) {
-		pli, err := formatPlaylistItem(item.(map[string]interface{}))
-		if err == NotFound {
-			continue
-		} else if err != nil {
-			return nil, err
-		}
+	if itemsMap, ok := m["items"]; ok {
+		for _, item := range itemsMap.([]interface{}) {
+			pli, err := formatPlaylistItem(item.(map[string]interface{}))
+			if err == NotFound {
+				continue
+			} else if err != nil {
+				return nil, err
+			}
 
-		ret.items = append(ret.items, pli)
+			ret.items = append(ret.items, pli)
+		}
 	}
 
 	if len(ret.items) == 0 {
