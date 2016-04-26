@@ -154,21 +154,28 @@ func doDownload(cmd *flag.FlagSet) {
 		}
 	} else {
 		if showNum, err := strconv.ParseInt(show, 10, 32); err != nil {
+			// not a show number, assume it is a show slug
+			series, err := funimationClient.GetSeries(show)
+			if err != nil {
+				log.Fatal(err)
+			}
+
 			for i := 1; i < cmd.NArg(); i++ {
 				arg := cmd.Arg(i)
-				// not a show number, assume it is a show slug
-				if epNum, err := strconv.ParseInt(arg, 10, 32); err != nil {
+				if arg == "*" {
+					if eps, err := series.GetAllEpisodes(); err != nil {
+						log.Fatal(err)
+					} else {
+						episodes = eps
+						break
+					}
+				} else if epNum, err := strconv.ParseInt(arg, 10, 32); err != nil {
 					getEpisode(func() (*funimation.Episode, error) {
 						return funimationClient.GetEpisodeFromShowEpisodeSlug(show, arg)
 					})
 				} else {
 					getEpisode(func() (*funimation.Episode, error) {
-						s, err := funimationClient.GetSeries(show)
-						if err != nil {
-							log.Fatal(err)
-						}
-
-						return s.GetEpisode(int(epNum))
+						return series.GetEpisode(int(epNum))
 					})
 				}
 			}
