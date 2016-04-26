@@ -48,8 +48,7 @@ func (d *Downloader) Download(destFileName string, threads int) (int64, error) {
 				if finfo, err := os.Stat(fpath); err == nil {
 					if finfo.Size() == job.byteEnd - job.byteStart + 1 {
 						// assume same size is synonymous with same file
-
-						d.OnBytesReceived(int(d.FragmentSize))
+						d.OnBytesReceived(int(finfo.Size()))
 
 						fragmentPaths[job.index] = fpath
 						errsChan <- nil
