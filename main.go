@@ -50,7 +50,6 @@ func main() {
 	downloadCmd.String("password", "", "your funimation account password")
 	downloadCmd.Int("bitrate", 0, "will take the closest `Kbps` bitrate if the given is not available, 0 = best")
 	downloadCmd.String("language", funimation.Subbed, "either `sub or dub`")
-	downloadCmd.String("out", "", "`file` save location")
 	downloadCmd.Bool("mock", false, "do everything normally but don't download the video")
 	downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
 	downloadCmd.Usage = func() {
@@ -205,7 +204,6 @@ func doDownload(cmd *flag.FlagSet) {
 	bitrate := cmd.Lookup("bitrate").Value.(flag.Getter).Get().(int)
 	language := funimation.EpisodeLanguage(cmd.Lookup("language").Value.(flag.Getter).Get().(string))
 	mock := cmd.Lookup("mock").Value.(flag.Getter).Get().(bool)
-	fname := cmd.Lookup("out").Value.(flag.Getter).Get().(string)
 	threads := cmd.Lookup("threads").Value.(flag.Getter).Get().(int)
 
 	// default to subbed
@@ -254,11 +252,7 @@ func doDownload(cmd *flag.FlagSet) {
 			log.Fatal("get stream: ", err)
 		}
 
-		if fname == "" {
-			fname = fmt.Sprintf("s%de%v - %s [%s][%s]", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
-		}
-
-		// remove characters that are not allowed in filenames
+		fname := fmt.Sprintf("s%de%v - %s [%s][%s]", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
 		fname = strings.Map(func(r rune) (rune) {
 			if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
 				return -1
@@ -266,7 +260,7 @@ func doDownload(cmd *flag.FlagSet) {
 			return r
 		}, fname)
 
-		fmt.Printf("\nDownloading %s Season - %d Episode %v\n", episode.Title(), episode.SeasonNumber(), episode.EpisodeNumber())
+		fmt.Printf("\nDownloading %s Season %d - Episode %v\n", episode.Title(), episode.SeasonNumber(), episode.EpisodeNumber())
 		fmt.Printf("Saving to: %s\n\n", fname)
 
 		if mock {
