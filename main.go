@@ -249,14 +249,9 @@ func doDownload(cmd *flag.FlagSet) {
 
 		assertBitrate(episode, bitrate, language)
 
-		stream, err := episode.GetStream(bitrate, language)
+		dl, err := episode.GetDownloader(bitrate, language)
 		if err != nil {
 			log.Fatal("get stream: ", err)
-		}
-
-		videoSize, err := stream.GetTotalSize()
-		if err != nil {
-			log.Fatal("get total size: ", err)
 		}
 
 		if fname == "" {
@@ -280,16 +275,16 @@ func doDownload(cmd *flag.FlagSet) {
 			progress := int64(0)
 			startTime := time.Now()
 
-			bytesStrLen := len(humanize.Comma(videoSize))
+			bytesStrLen := len(humanize.Comma(dl.Size()))
 
 			lastTime := time.Now()
 			var rate float64 = 0
 			var bytesSinceLastTime int64 = 0
-			onBytesWritten := func(bytes int) {
+			dl.OnBytesReceived = func(bytes int) {
 				progress += int64(bytes)
 				bytesSinceLastTime += int64(bytes)
 
-				percent := float32(progress) / float32(videoSize)
+				percent := float32(progress) / float32(dl.Size())
 				newTime := time.Now()
 				timeDiff := newTime.Sub(lastTime)
 				if secs := timeDiff.Seconds(); secs >= 0.5 {
@@ -330,7 +325,7 @@ func doDownload(cmd *flag.FlagSet) {
 				fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
 			}
 
-			if _, err := stream.Download(fname, threads, onBytesWritten); err != nil {
+			if _, err := dl.Download(fname, threads); err != nil {
 				fmt.Println()
 				log.Fatal("download: ", err)
 			}

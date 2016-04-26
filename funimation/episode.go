@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"ssttevee.com/funimation-downloader/funimation/downloader"
 )
 
 type EpisodeLanguage string
@@ -67,7 +68,7 @@ func (e *Episode) BitRates(lang EpisodeLanguage) ([]int) {
 	return e.bitRates[lang][:]
 }
 
-func (e *Episode) GetStreamUrl(bitrate int, lang EpisodeLanguage) (string, error) {
+func (e *Episode) GetHLSUrl(bitrate int, lang EpisodeLanguage) (string, error) {
 	funId, err := e.getFunimationId(lang)
 	if err != nil {
 		return "", err
@@ -80,6 +81,21 @@ func (e *Episode) GetStreamUrl(bitrate int, lang EpisodeLanguage) (string, error
 	bitrate = e.FixBitrate(bitrate, lang)
 
 	return fmt.Sprintf("http://wpc.8c48.edgecastcdn.net/038C48/SV/480/%s/%s-480-%dK.mp4.m3u8%s", funId, funId, bitrate, e.authToken), nil
+}
+
+func (e *Episode) GetMp4Url(bitrate int, lang EpisodeLanguage) (string, error) {
+	funId, err := e.getFunimationId(lang)
+	if err != nil {
+		return "", err
+	}
+
+	if e.authToken == "" {
+		return "", errors.New("Couldn't find auth token")
+	}
+
+	bitrate = e.FixBitrate(bitrate, lang)
+
+	return fmt.Sprintf("http://wpc.8c48.edgecastcdn.net/008C48/SV/480/%s/%s-480-%dK.mp4%s", funId, funId, bitrate, e.authToken), nil
 }
 
 func (e *Episode) getFunimationId(lang EpisodeLanguage) (string, error) {
@@ -219,8 +235,22 @@ func (e *Episode) handlePlaylistItemClip(clip *playlistItemClip) (error) {
 	return nil
 }
 
+func (e *Episode) GetDownloader(bitRate int, language EpisodeLanguage) (*downloader.Downloader, error) {
+	mp4Url, err := e.GetMp4Url(bitRate, language)
+	if err != nil {
+		return nil, err
+	}
+
+	stream, err := downloader.New(mp4Url)
+	if err != nil {
+		return nil, err
+	}
+
+	return stream, nil
+}
+
 func (e *Episode) GetStream(bitRate int, language EpisodeLanguage) (*m3u8.M3u8, error) {
-	streamUrl, err := e.GetStreamUrl(bitRate, language)
+	streamUrl, err := e.GetHLSUrl(bitRate, language)
 	if err != nil {
 		return nil, err
 	}
