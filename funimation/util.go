@@ -37,7 +37,13 @@ func searchForEpisodes(client *http.Client, showId, limit, offset int) ([]*Episo
 	searchUrl := fmt.Sprintf("http://www.funimation.com/shows/viewAllFiltered?section=episodes&limit=%d&offset=%d&showid=%d", limit, offset, showId)
 	ajax, err := getJsonObject(client, searchUrl)
 	if err != nil {
-		return nil, err
+		client.Get("http://www.funimation.com/videos/episodes")
+		// ignore response
+
+		ajax, err = getJsonObject(client, searchUrl)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	tokenizer := html.NewTokenizer(strings.NewReader(ajax["main"].(string)))
