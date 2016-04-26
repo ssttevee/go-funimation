@@ -319,14 +319,13 @@ func doDownload(cmd *flag.FlagSet) {
 				fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
 			}
 
-			if _, err := dl.Download(fname, threads); err != nil {
-				fmt.Println()
-				log.Fatal("download: ", err)
-			}
 			fmt.Println()
-
-			endTime := time.Now()
-			fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(progress)), endTime.Sub(startTime))
+			if byteCount, err := dl.Download(fname, threads); err != nil {
+				log.Fatal("download: ", err)
+			} else {
+				endTime := time.Now()
+				fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(byteCount)), endTime.Sub(startTime))
+			}
 		}
 	}
 }
