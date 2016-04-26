@@ -54,10 +54,10 @@ func main() {
 	downloadCmd.Bool("mock", false, "do everything normally but don't download the video")
 	downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
 	downloadCmd.Usage = func() {
-		fmt.Fprintln(os.Stderr, "Usage: funimation download [options] <show> <episode>")
-		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show> <episode-num>")
-		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show-id> <episode-num>")
-		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <episode-url>\n")
+		fmt.Fprintln(os.Stderr, "Usage: funimation download [options] <show> <episode> [<episode>...]")
+		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show> <episode-nums> [<episode-nums>...]")
+		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show-id> <episode-nums> [<episode-nums>...]")
+		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <episode-url> [<episode-url>...]\n")
 		fmt.Fprintln(os.Stderr, "Downloads an episode from the given show\n")
 		fmt.Fprintln(os.Stderr, "Options:")
 		downloadCmd.PrintDefaults()
@@ -115,8 +115,7 @@ func doList(show string) {
 
 func doDownload(cmd *flag.FlagSet) {
 	show := cmd.Arg(0)
-	episode := cmd.Arg(1)
-	if show == "" || !strings.HasPrefix(show, "http") && episode == "" {
+	if show == "" || !strings.HasPrefix(show, "http") && cmd.Arg(1) == "" {
 		cmd.Usage()
 		os.Exit(2)
 	}
@@ -133,49 +132,68 @@ func doDownload(cmd *flag.FlagSet) {
 		}
 	}
 
-	var ep *funimation.Episode = nil
-	if strings.HasPrefix(show, "http") {
-		if !strings.HasPrefix(show[strings.Index(show, "://"):], "://www.funimation.com/shows/") {
-			log.Fatal("Only funimation show urls are allowed")
+	episodes := make([]*funimation.Episode, 0)
+	getEpisode := func(f func() (*funimation.Episode, error)) {
+		episode, err := f()
+		if err != nil {
+			log.Fatal(err)
 		}
 
-		var err error
-		ep, err = funimationClient.GetEpisodeFromUrl(show)
-		if err != nil {
-			log.Fatal("get episode from url: ", err)
+		episodes = append(episodes, episode)
+	}
+
+	if strings.HasPrefix(show, "http") {
+		for _, url := range cmd.Args() {
+			if !strings.HasPrefix(url[strings.Index(url, "://"):], "://www.funimation.com/shows/") {
+				log.Fatal("Only funimation show urls are allowed")
+			}
+
+			getEpisode(func() (*funimation.Episode, error) {
+				return funimationClient.GetEpisodeFromUrl(url)
+			})
 		}
 	} else {
-		showNum, err := strconv.ParseInt(show, 10, 32)
-		if err != nil {
-			// not a show number, assume it is a show slug
-			epNum, err := strconv.ParseInt(episode, 10, 32)
-			if err != nil {
-				ep, err = funimationClient.GetEpisodeFromShowEpisodeSlug(show, episode)
-			} else {
-				s, err := funimationClient.GetSeries(show)
-				if err != nil {
-					log.Fatal("get series: ", err)
-				}
+		if showNum, err := strconv.ParseInt(show, 10, 32); err != nil {
+			for i := 1; i < cmd.NArg(); i++ {
+				arg := cmd.Arg(i)
+				// not a show number, assume it is a show slug
+				if epNum, err := strconv.ParseInt(arg, 10, 32); err != nil {
+					getEpisode(func() (*funimation.Episode, error) {
+						return funimationClient.GetEpisodeFromShowEpisodeSlug(show, arg)
+					})
+				} else {
+					getEpisode(func() (*funimation.Episode, error) {
+						s, err := funimationClient.GetSeries(show)
+						if err != nil {
+							log.Fatal(err)
+						}
 
-				ep, err = s.GetEpisode(int(epNum))
-				if err != nil {
-					log.Fatal("get episode: ", err)
+						return s.GetEpisode(int(epNum))
+					})
 				}
 			}
 		} else {
-			epNum, err := strconv.ParseInt(episode, 10, 32)
-			if err != nil {
-				log.Fatal("Episode number must be a number")
-			}
+			for i := 1; i < cmd.NArg(); i++ {
+				arg := cmd.Arg(i)
 
-			ep, err = funimationClient.GetEpisode(int(showNum), int(epNum))
+				epNum, err := strconv.ParseInt(arg, 10, 32)
+				if err != nil {
+					log.Fatal(arg, " is not a number")
+				}
+
+				getEpisode(func() (*funimation.Episode, error) {
+					return funimationClient.GetEpisode(int(showNum), int(epNum))
+				})
+			}
 		}
 	}
 
-	if ep == nil {
+	if len(episodes) == 0 {
 		cmd.Usage()
 		os.Exit(2)
 	}
+
+	fmt.Printf("Found %d episodes:\n", len(episodes))
 
 	bitrate := cmd.Lookup("bitrate").Value.(flag.Getter).Get().(int)
 	language := funimation.EpisodeLanguage(cmd.Lookup("language").Value.(flag.Getter).Get().(string))
@@ -189,130 +207,132 @@ func doDownload(cmd *flag.FlagSet) {
 		language = funimation.Subbed
 	}
 
-	foundLang := false
-	hasSub := false
-	for _, l := range ep.Languages() {
-		if l == funimation.Subbed {
-			hasSub = true
-		}
-		if language == l {
-			foundLang = true
-		}
-	}
-
-	// make sure language is available
-	if !foundLang {
-		fmt.Printf("Language mode - %s - is unavailable; ", language)
-
-		// if subbed is unavailable, something is wrong... just give up...
-		if !hasSub {
-			log.Fatal("exiting...")
-			os.Exit(2)
+	for _, episode := range episodes {
+		foundLang := false
+		hasSub := false
+		for _, l := range episode.Languages() {
+			if l == funimation.Subbed {
+				hasSub = true
+			}
+			if language == l {
+				foundLang = true
+			}
 		}
 
-		fmt.Println("defaulting to sub")
-		language = funimation.Subbed
-	}
+		// make sure language is available
+		if !foundLang {
+			fmt.Printf("Language mode - %s - is unavailable; ", language)
 
-	if bitrate == 0 {
-		bitrate = ep.FixBitrate(bitrate, language)
-	}
-
-	if bitrate == 0 {
-		log.Fatal("Can't download that episode")
-	}
-
-	assertBitrate(ep, bitrate, language)
-
-	stream, err := ep.GetStream(bitrate, language)
-	if err != nil {
-		log.Fatal("get stream: ", err)
-	}
-
-	videoSize, err := stream.GetTotalSize()
-	if err != nil {
-		log.Fatal("get total size: ", err)
-	}
-
-	if fname == "" {
-		fname = fmt.Sprintf("s%de%v - %s [%s][%s]", ep.SeasonNumber(), ep.EpisodeNumber(), ep.Title(), bitrateToQuality(bitrate), language)
-	}
-
-	// remove characters that are not allowed in filenames
-	fname = strings.Map(func(r rune) (rune) {
-		if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-			return -1
-		}
-		return r
-	}, fname)
-
-	fmt.Printf("Downloading %s Season - %d Episode %v\n", ep.Title(), ep.SeasonNumber(), ep.EpisodeNumber())
-	fmt.Printf("Saving to: %s\n\n", fname)
-
-	progress := int64(0)
-	startTime := time.Now()
-	if mock {
-		fmt.Println("Received mock flag, not downloading...")
-	} else {
-		bytesStrLen := len(humanize.Comma(videoSize))
-
-		lastTime := time.Now()
-		var rate float64 = 0
-		var bytesSinceLastTime int64 = 0
-		onBytesWritten := func(bytes int) {
-			progress += int64(bytes)
-			bytesSinceLastTime += int64(bytes)
-
-			percent := float32(progress) / float32(videoSize)
-			newTime := time.Now()
-			timeDiff := newTime.Sub(lastTime)
-			if secs := timeDiff.Seconds(); secs >= 0.5 {
-				rate = float64(bytesSinceLastTime) / secs
-				lastTime = newTime
-				bytesSinceLastTime = 0
+			// if subbed is unavailable, something is wrong... just give up...
+			if !hasSub {
+				log.Fatal("exiting...")
+				os.Exit(2)
 			}
 
-			percentStr := fmt.Sprintf("%.2f", percent * float32(100))
-			for ; len(percentStr) < 6; {
-				percentStr = " " + percentStr
-			}
+			fmt.Println("defaulting to sub")
+			language = funimation.Subbed
+		}
 
-			progBar := "["
-			progBarLen := 30
-			for i := 0; i < progBarLen; i++ {
-				if float32(i) < float32(progBarLen) * percent {
-					if progBar[len(progBar) - 1] == byte('>') {
-						progBar = progBar[:len(progBar) - 1] + "="
-					}
-					progBar += ">"
-				} else {
-					progBar += " "
+		if bitrate == 0 {
+			bitrate = episode.FixBitrate(bitrate, language)
+			if bitrate == 0 {
+				log.Fatal("Can't download that episode")
+			}
+		}
+
+		assertBitrate(episode, bitrate, language)
+
+		stream, err := episode.GetStream(bitrate, language)
+		if err != nil {
+			log.Fatal("get stream: ", err)
+		}
+
+		videoSize, err := stream.GetTotalSize()
+		if err != nil {
+			log.Fatal("get total size: ", err)
+		}
+
+		if fname == "" {
+			fname = fmt.Sprintf("s%de%v - %s [%s][%s]", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
+		}
+
+		// remove characters that are not allowed in filenames
+		fname = strings.Map(func(r rune) (rune) {
+			if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
+				return -1
+			}
+			return r
+		}, fname)
+
+		fmt.Printf("\nDownloading %s Season - %d Episode %v\n", episode.Title(), episode.SeasonNumber(), episode.EpisodeNumber())
+		fmt.Printf("Saving to: %s\n\n", fname)
+
+		if mock {
+			fmt.Println("Received mock flag, not downloading...")
+		} else {
+			progress := int64(0)
+			startTime := time.Now()
+
+			bytesStrLen := len(humanize.Comma(videoSize))
+
+			lastTime := time.Now()
+			var rate float64 = 0
+			var bytesSinceLastTime int64 = 0
+			onBytesWritten := func(bytes int) {
+				progress += int64(bytes)
+				bytesSinceLastTime += int64(bytes)
+
+				percent := float32(progress) / float32(videoSize)
+				newTime := time.Now()
+				timeDiff := newTime.Sub(lastTime)
+				if secs := timeDiff.Seconds(); secs >= 0.5 {
+					rate = float64(bytesSinceLastTime) / secs
+					lastTime = newTime
+					bytesSinceLastTime = 0
 				}
+
+				percentStr := fmt.Sprintf("%.2f", percent * float32(100))
+				for ; len(percentStr) < 6; {
+					percentStr = " " + percentStr
+				}
+
+				progBar := "["
+				progBarLen := 30
+				for i := 0; i < progBarLen; i++ {
+					if float32(i) < float32(progBarLen) * percent {
+						if progBar[len(progBar) - 1] == byte('>') {
+							progBar = progBar[:len(progBar) - 1] + "="
+						}
+						progBar += ">"
+					} else {
+						progBar += " "
+					}
+				}
+				progBar += "]"
+
+				bytesStr := humanize.Comma(progress)
+				for ; len(bytesStr) < bytesStrLen; {
+					bytesStr = " " + bytesStr
+				}
+
+				rateStr := humanize.Bytes(uint64(rate))
+				for ; len(rateStr) < 10; {
+					rateStr = " " + rateStr
+				}
+
+				fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
 			}
-			progBar += "]"
 
-			bytesStr := humanize.Comma(progress)
-			for ; len(bytesStr) < bytesStrLen; {
-				bytesStr = " " + bytesStr
+			if _, err := stream.Download(fname, threads, onBytesWritten); err != nil {
+				fmt.Println()
+				log.Fatal("download: ", err)
 			}
-
-			rateStr := humanize.Bytes(uint64(rate))
-			for ; len(rateStr) < 10; {
-				rateStr = " " + rateStr
-			}
-
-			fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
-		}
-
-		if _, err := stream.Download(fname, threads, onBytesWritten); err != nil {
 			fmt.Println()
-			log.Fatal("download: ", err)
-		}
-		fmt.Println()
-	}
-	endTime := time.Now()
 
-	fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(progress)), endTime.Sub(startTime))
+			endTime := time.Now()
+			fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(progress)), endTime.Sub(startTime))
+		}
+	}
 }
 
 func assertBitrate(ep *funimation.Episode, bitrate int, language funimation.EpisodeLanguage) {
