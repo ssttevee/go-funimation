@@ -11,6 +11,8 @@ import (
 	"github.com/ssttevee/go-downloader"
 )
 
+var GuessUrls = false
+
 type EpisodeLanguage string
 
 const (
@@ -214,14 +216,26 @@ func (e *Episode) handlePlaylistItemClip(clip *playlistItemClip) (error) {
 		// collect bitrates
 		e.bitRates[language] = make([]int, 0)
 
-		if strings.HasPrefix(video.sdUrl, "http") {
-			e.bitRates[language] = append(e.bitRates[language], 750, 1500)
-		}
-		if strings.HasPrefix(video.hdUrl, "http") {
-			e.bitRates[language] = append(e.bitRates[language], 2000, 2500)
-		}
-		if strings.HasPrefix(video.hd1080Url, "http") {
-			e.bitRates[language] = append(e.bitRates[language], 4000)
+		if GuessUrls {
+			if video.sdUrl != "" {
+				e.bitRates[language] = append(e.bitRates[language], 750, 1500)
+			}
+			if video.hdUrl != "" {
+				e.bitRates[language] = append(e.bitRates[language], 2000, 2500)
+			}
+			if video.hd1080Url != "" {
+				e.bitRates[language] = append(e.bitRates[language], 4000)
+			}
+		} else {
+			if strings.HasPrefix(video.sdUrl, "http") {
+				e.bitRates[language] = append(e.bitRates[language], 750, 1500)
+			}
+			if strings.HasPrefix(video.hdUrl, "http") {
+				e.bitRates[language] = append(e.bitRates[language], 2000, 2500)
+			}
+			if strings.HasPrefix(video.hd1080Url, "http") {
+				e.bitRates[language] = append(e.bitRates[language], 4000)
+			}
 		}
 
 		// collect languages

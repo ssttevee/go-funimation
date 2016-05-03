@@ -53,6 +53,7 @@ func main() {
 	downloadCmd.String("language", funimation.Subbed, "either `sub or dub`")
 	downloadCmd.Bool("url-only", false, "get the url instead of downloading")
 	downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
+	downloadCmd.Bool("enable-url-guessing", false, "guess urls for non-public videos")
 	downloadCmd.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: funimation download [options] <show> <episode> [<episode>...]")
 		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show> <episode-nums> [<episode-nums>...]")
@@ -141,6 +142,8 @@ func doDownload(cmd *flag.FlagSet) {
 
 		episodes = append(episodes, episode)
 	}
+
+	funimation.GuessUrls = cmd.Lookup("enable-url-guessing").Value.(flag.Getter).Get().(bool)
 
 	if strings.HasPrefix(show, "http") {
 		for _, url := range cmd.Args() {
@@ -269,7 +272,7 @@ func doDownload(cmd *flag.FlagSet) {
 				log.Fatal("get url: ", err)
 			}
 
-			fmt.Printf("Season %d, Episode %v: %s", episode.SeasonNumber(), episode.EpisodeNumber(), url)
+			fmt.Printf("Season %d, Episode %v: %s\n", episode.SeasonNumber(), episode.EpisodeNumber(), url)
 			continue
 		}
 
