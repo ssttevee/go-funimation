@@ -7,8 +7,14 @@ import (
 	"errors"
 	"strconv"
 	"fmt"
+	"github.com/ssttevee/go-downloader"
+	"os"
 )
 var NotFound = errors.New("Not found")
+
+func init() {
+	downloader.TempDir = os.TempDir() + "/.funimation"
+}
 
 type Client struct {
 	httpClient *http.Client

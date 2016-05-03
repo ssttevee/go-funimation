@@ -9,7 +9,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
-	"ssttevee.com/funimation-downloader/funimation/downloader"
+	"github.com/ssttevee/go-downloader"
 )
 
 type EpisodeLanguage string
