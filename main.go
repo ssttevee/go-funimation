@@ -289,71 +289,67 @@ func doDownload(cmd *flag.FlagSet) {
 		fmt.Printf("\nDownloading %s Season %d - Episode %v\n", episode.Title(), episode.SeasonNumber(), episode.EpisodeNumber())
 		fmt.Printf("Saving to: %s\n\n", fname)
 
-		if urlOnly {
-			fmt.Println("Received mock flag, not downloading...")
-		} else {
-			startTime := time.Now()
+		startTime := time.Now()
 
-			bytesStrLen := len(humanize.Comma(dl.Size()))
+		bytesStrLen := len(humanize.Comma(dl.Size()))
 
-			var lastTime = time.Now()
-			var rate float64
-			var bytesSinceLastTime int64
-			var d *downloader.Download
-			dl.OnBytesReceived = func(bytes int) {
-				bytesSinceLastTime += int64(bytes)
+		var lastTime = time.Now()
+		var rate float64
+		var bytesSinceLastTime int64
+		var d *downloader.Download
+		dl.OnBytesReceived = func(bytes int) {
+			bytesSinceLastTime += int64(bytes)
 
-				percent := d.Percent()
-				newTime := time.Now()
-				timeDiff := newTime.Sub(lastTime)
-				if secs := timeDiff.Seconds(); secs >= 0.5 {
-					rate = float64(bytesSinceLastTime) / secs
-					lastTime = newTime
-					bytesSinceLastTime = 0
-				}
+			percent := d.Percent()
+			newTime := time.Now()
+			timeDiff := newTime.Sub(lastTime)
+			if secs := timeDiff.Seconds(); secs >= 0.5 {
+				rate = float64(bytesSinceLastTime) / secs
+				lastTime = newTime
+				bytesSinceLastTime = 0
+			}
 
-				percentStr := fmt.Sprintf("%.2f", percent * float32(100))
-				for ; len(percentStr) < 6; {
-					percentStr = " " + percentStr
-				}
+			percentStr := fmt.Sprintf("%.2f", percent * float32(100))
+			for ; len(percentStr) < 6; {
+				percentStr = " " + percentStr
+			}
 
-				progBar := "["
-				progBarLen := 30
-				for i := 0; i < progBarLen; i++ {
-					if float32(i) < float32(progBarLen) * percent {
-						if progBar[len(progBar) - 1] == byte('>') {
-							progBar = progBar[:len(progBar) - 1] + "="
-						}
-						progBar += ">"
-					} else {
-						progBar += " "
+			progBar := "["
+			progBarLen := 30
+			for i := 0; i < progBarLen; i++ {
+				if float32(i) < float32(progBarLen) * percent {
+					if progBar[len(progBar) - 1] == byte('>') {
+						progBar = progBar[:len(progBar) - 1] + "="
 					}
+					progBar += ">"
+				} else {
+					progBar += " "
 				}
-				progBar += "]"
+			}
+			progBar += "]"
 
-				bytesStr := humanize.Comma(int64(d.Current()))
-				for ; len(bytesStr) < bytesStrLen; {
-					bytesStr = " " + bytesStr
-				}
-
-				rateStr := humanize.Bytes(uint64(rate))
-				for ; len(rateStr) < 10; {
-					rateStr = " " + rateStr
-				}
-
-				fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
+			bytesStr := humanize.Comma(int64(d.Current()))
+			for ; len(bytesStr) < bytesStrLen; {
+				bytesStr = " " + bytesStr
 			}
 
-			fmt.Println()
-			if d, err = dl.Download(fname, threads); err != nil {
-				log.Fatal("download: ", err)
-			} else {
-				if err := d.Wait(); err != nil {
-					log.Fatal("wait: ", err)
-				}
-
-				fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(dl.Size())), time.Now().Sub(startTime))
+			rateStr := humanize.Bytes(uint64(rate))
+			for ; len(rateStr) < 10; {
+				rateStr = " " + rateStr
 			}
+
+			fmt.Printf("\r%s%% %s %s %s/s", percentStr, progBar, bytesStr, rateStr)
+		}
+
+		fmt.Println()
+		if d, err = dl.Download(fname, threads); err != nil {
+			log.Fatal("download: ", err)
+		} else {
+			if err := d.Wait(); err != nil {
+				log.Fatal("wait: ", err)
+			}
+
+			fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(dl.Size())), time.Now().Sub(startTime))
 		}
 	}
 }
