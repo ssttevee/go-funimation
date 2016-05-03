@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"ssttevee.com/funimation-downloader/funimation"
+	"github.com/ssttevee/funimation/lib"
 	"net/http/cookiejar"
 	"log"
 	"io"
