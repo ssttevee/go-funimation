@@ -2,7 +2,6 @@ package funimation
 
 import (
 	"errors"
-	"github.com/ssttevee/funimation/funimation/m3u8"
 	"net/http"
 	"strings"
 	"strconv"
@@ -242,20 +241,6 @@ func (e *Episode) GetDownloader(bitRate int, language EpisodeLanguage) (*downloa
 	}
 
 	stream, err := downloader.New(mp4Url)
-	if err != nil {
-		return nil, err
-	}
-
-	return stream, nil
-}
-
-func (e *Episode) GetStream(bitRate int, language EpisodeLanguage) (*m3u8.M3u8, error) {
-	streamUrl, err := e.GetHLSUrl(bitRate, language)
-	if err != nil {
-		return nil, err
-	}
-
-	stream, err := m3u8.New(streamUrl)
 	if err != nil {
 		return nil, err
 	}
