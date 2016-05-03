@@ -12,6 +12,7 @@ import (
 	"flag"
 	"strings"
 	"strconv"
+	"github.com/ssttevee/go-downloader"
 )
 
 type writerMiddleware struct {
@@ -252,7 +253,7 @@ func doDownload(cmd *flag.FlagSet) {
 			log.Fatal("get stream: ", err)
 		}
 
-		fname := fmt.Sprintf("s%de%v - %s [%s][%s]", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
+		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
 		fname = strings.Map(func(r rune) (rune) {
 			if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
 				return -1
@@ -266,19 +267,18 @@ func doDownload(cmd *flag.FlagSet) {
 		if mock {
 			fmt.Println("Received mock flag, not downloading...")
 		} else {
-			progress := int64(0)
 			startTime := time.Now()
 
 			bytesStrLen := len(humanize.Comma(dl.Size()))
 
-			lastTime := time.Now()
-			var rate float64 = 0
-			var bytesSinceLastTime int64 = 0
+			var lastTime = time.Now()
+			var rate float64
+			var bytesSinceLastTime int64
+			var d *downloader.Download
 			dl.OnBytesReceived = func(bytes int) {
-				progress += int64(bytes)
 				bytesSinceLastTime += int64(bytes)
 
-				percent := float32(progress) / float32(dl.Size())
+				percent := d.Percent()
 				newTime := time.Now()
 				timeDiff := newTime.Sub(lastTime)
 				if secs := timeDiff.Seconds(); secs >= 0.5 {
@@ -306,7 +306,7 @@ func doDownload(cmd *flag.FlagSet) {
 				}
 				progBar += "]"
 
-				bytesStr := humanize.Comma(progress)
+				bytesStr := humanize.Comma(d.Current())
 				for ; len(bytesStr) < bytesStrLen; {
 					bytesStr = " " + bytesStr
 				}
@@ -320,11 +320,14 @@ func doDownload(cmd *flag.FlagSet) {
 			}
 
 			fmt.Println()
-			if byteCount, err := dl.Download(fname, threads); err != nil {
+			if d, err = dl.Download(fname, threads); err != nil {
 				log.Fatal("download: ", err)
 			} else {
-				endTime := time.Now()
-				fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(byteCount)), endTime.Sub(startTime))
+				if err := d.Wait(); err != nil {
+					log.Fatal("wait: ", err)
+				}
+
+				fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(dl.Size()), time.Now().Sub(startTime))
 			}
 		}
 	}
