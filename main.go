@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"./lib"
+	"github.com/ssttevee/funimation/lib"
 	"net/http/cookiejar"
 	"log"
 	"io"

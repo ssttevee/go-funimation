@@ -12,6 +12,16 @@ funimation download steins-gate 1
 
 ##Installation
 
+###Via `go install`
+
+In your command line, with the latest version of go installed, you can simply use the following command:
+
+```
+go install github.com/ssttevee/funimation
+```
+
+###Manual Install
+
 Download one of the prebuilt executables, and extract it to somewhere that is in your environment path variable
 
 ##Advanced Usage
