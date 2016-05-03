@@ -254,7 +254,7 @@ func doDownload(cmd *flag.FlagSet) {
 				log.Fatal("get url: ", err)
 			}
 
-			fmt.Printf("Season %d, Episode %d: %s", episode.SeasonNumber(), episode.EpisodeNumber(), url)
+			fmt.Printf("Season %d, Episode %v: %s", episode.SeasonNumber(), episode.EpisodeNumber(), url)
 			continue
 		}
 
