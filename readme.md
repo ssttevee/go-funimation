@@ -10,8 +10,11 @@ The following command will download the first episode of **Steins; Gate** at the
 funimation download steins-gate 1
 ```
 
-##Advanced Usage
+##Installation
 
+Download one of the prebuilt executables, and extract it to somewhere that is in your environment path variable
+
+##Advanced Usage
 
 ###Terminology
 
