@@ -51,7 +51,7 @@ func main() {
 	downloadCmd.String("password", "", "your funimation account password")
 	downloadCmd.Int("bitrate", 0, "will take the closest `Kbps` bitrate if the given is not available, 0 = best")
 	downloadCmd.String("language", funimation.Subbed, "either `sub or dub`")
-	downloadCmd.Bool("mock", false, "do everything normally but don't download the video")
+	downloadCmd.Bool("url-only", false, "get the url instead of downloading")
 	downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
 	downloadCmd.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: funimation download [options] <show> <episode> [<episode>...]")
@@ -204,7 +204,7 @@ func doDownload(cmd *flag.FlagSet) {
 
 	bitrate := cmd.Lookup("bitrate").Value.(flag.Getter).Get().(int)
 	language := funimation.EpisodeLanguage(cmd.Lookup("language").Value.(flag.Getter).Get().(string))
-	mock := cmd.Lookup("mock").Value.(flag.Getter).Get().(bool)
+	urlOnly := cmd.Lookup("url-only").Value.(flag.Getter).Get().(bool)
 	threads := cmd.Lookup("threads").Value.(flag.Getter).Get().(int)
 
 	// default to subbed
@@ -248,6 +248,16 @@ func doDownload(cmd *flag.FlagSet) {
 
 		assertBitrate(episode, bitrate, language)
 
+		if urlOnly {
+			url, err := episode.GetMp4Url(bitrate, language)
+			if err != nil {
+				log.Fatal("get url: ", err)
+			}
+
+			fmt.Printf("Season %d, Episode %d: %s", episode.SeasonNumber(), episode.EpisodeNumber(), url)
+			continue
+		}
+
 		dl, err := episode.GetDownloader(bitrate, language)
 		if err != nil {
 			log.Fatal("get stream: ", err)
@@ -264,7 +274,7 @@ func doDownload(cmd *flag.FlagSet) {
 		fmt.Printf("\nDownloading %s Season %d - Episode %v\n", episode.Title(), episode.SeasonNumber(), episode.EpisodeNumber())
 		fmt.Printf("Saving to: %s\n\n", fname)
 
-		if mock {
+		if urlOnly {
 			fmt.Println("Received mock flag, not downloading...")
 		} else {
 			startTime := time.Now()
