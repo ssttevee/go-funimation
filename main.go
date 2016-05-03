@@ -316,7 +316,7 @@ func doDownload(cmd *flag.FlagSet) {
 				}
 				progBar += "]"
 
-				bytesStr := humanize.Comma(d.Current())
+				bytesStr := humanize.Comma(int64(d.Current()))
 				for ; len(bytesStr) < bytesStrLen; {
 					bytesStr = " " + bytesStr
 				}
@@ -337,7 +337,7 @@ func doDownload(cmd *flag.FlagSet) {
 					log.Fatal("wait: ", err)
 				}
 
-				fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(dl.Size()), time.Now().Sub(startTime))
+				fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(dl.Size())), time.Now().Sub(startTime))
 			}
 		}
 	}
