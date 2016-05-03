@@ -153,43 +153,58 @@ func doDownload(cmd *flag.FlagSet) {
 			})
 		}
 	} else {
+		var series *funimation.Series
 		if showNum, err := strconv.ParseInt(show, 10, 32); err != nil {
 			// not a show number, assume it is a show slug
-			series, err := funimationClient.GetSeries(show)
+			series, err = funimationClient.GetSeries(show)
 			if err != nil {
 				log.Fatal(err)
 			}
-
-			for i := 1; i < cmd.NArg(); i++ {
-				arg := cmd.Arg(i)
-				if arg == "*" {
-					if eps, err := series.GetAllEpisodes(); err != nil {
-						log.Fatal(err)
-					} else {
-						episodes = eps
-						break
-					}
-				} else if epNum, err := strconv.ParseInt(arg, 10, 32); err != nil {
-					getEpisode(func() (*funimation.Episode, error) {
-						return funimationClient.GetEpisodeFromShowEpisodeSlug(show, arg)
-					})
-				} else {
-					getEpisode(func() (*funimation.Episode, error) {
-						return series.GetEpisode(int(epNum))
-					})
-				}
-			}
 		} else {
-			for i := 1; i < cmd.NArg(); i++ {
-				arg := cmd.Arg(i)
+			series, err = funimationClient.GetSeriesById(int(showNum))
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
 
-				epNum, err := strconv.ParseInt(arg, 10, 32)
-				if err != nil {
-					log.Fatal(arg, " is not a number")
+		for i := 1; i < cmd.NArg(); i++ {
+			arg := cmd.Arg(i)
+			if arg == "*" {
+				if eps, err := series.GetAllEpisodes(); err != nil {
+					log.Fatal(err)
+				} else {
+					episodes = eps
+					break
+				}
+			} else if strings.ContainsRune(arg, '-') {
+				startEnd := strings.Split(arg, "-")
+				if len(startEnd) != 2 {
+					log.Fatalf("Range value `%s` must contain 1 dash character", arg)
 				}
 
+				start, err := strconv.ParseInt(startEnd[0], 10, 32)
+				if err != nil {
+					log.Fatal("Range value must be numeric")
+				}
+
+				end, err := strconv.ParseInt(startEnd[1], 10, 32)
+				if err != nil {
+					log.Fatal("Range value must be numeric")
+				}
+
+				eps, err := series.GetEpisodesRange(int(start), int(end))
+				if err != nil {
+					log.Fatal(err)
+				}
+
+				episodes = append(episodes, eps...)
+			} else if epNum, err := strconv.ParseInt(arg, 10, 32); err != nil {
 				getEpisode(func() (*funimation.Episode, error) {
-					return funimationClient.GetEpisode(int(showNum), int(epNum))
+					return series.GetEpisodeBySlug(arg)
+				})
+			} else {
+				getEpisode(func() (*funimation.Episode, error) {
+					return series.GetEpisode(int(epNum))
 				})
 			}
 		}

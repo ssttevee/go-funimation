@@ -77,9 +77,8 @@ Note: The ellipsis (`...`) means the multiple of the last argument may be added 
 
 ###Batching
 
-The `{episode-num}` or `{episode-tag}` may be replace with an asterisk (`*`) to download all episodes in a series
+The `{episode-num}` or `{episode-tag}` may be replace with an asterisk (`*`) to download all episodes in a series as well as a range of episodes (i.e. `1-4` or `6-24`).
 
 ##Upcoming Features
 
-- Ranged batching, give a range of numbers to batch download selectively
 - Improve error message

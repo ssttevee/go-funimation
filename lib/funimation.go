@@ -51,7 +51,15 @@ func (f *Client) Login(email, password string) error {
 }
 
 func (f *Client) GetSeries(showSlug string) (*Series, error) {
-	ajax, err := getJsonObject(f.httpClient, "http://www.funimation.com/frontend_api/getShow/funimation_website/" + showSlug)
+	return f.getShowApi("funimation_website", showSlug)
+}
+
+func (f *Client) GetSeriesById(showId int) (*Series, error) {
+	return f.getShowApi("show_id", showId)
+}
+
+func (f *Client) getShowApi(param string, value interface{}) (*Series, error) {
+	ajax, err := getJsonObject(f.httpClient, fmt.Sprintf("http://www.funimation.com/frontend_api/getShow/%s/%v", param, value))
 	if err != nil {
 		return nil, err
 	}
@@ -89,31 +97,19 @@ func (f *Client) GetSeries(showSlug string) (*Series, error) {
 		return nil, NotFound
 	}
 
+	showSlug, ok := info["funimation_website"]
+	if !ok {
+		return nil, NotFound
+	}
+
 	return &Series{
-		slug: showSlug,
+		slug: showSlug.(string),
 		client: f.httpClient,
 		showId: showId,
 		name: title.(string),
 		description: summary.(string),
 		posterUrl: "http://www.funimation.com/admin/uploads/default/shows/show_thumbnail/2_thumbnail/" + thumbnail.(string),
 	}, nil
-}
-
-func (f *Client) GetEpisode(showId, ep int) (*Episode, error) {
-	eps, err := searchForEpisodes(f.httpClient, showId, 1, ep - 1)
-	if err != nil {
-		return nil, err
-	}
-
-	if len(eps) > 0 {
-		return eps[0], nil
-	} else {
-		return nil, NotFound
-	}
-}
-
-func (f *Client) GetEpisodeFromShowEpisodeSlug(showSlug, episodeSlug string) (*Episode, error) {
-	return f.GetEpisodeFromUrl(fmt.Sprintf("http://www.funimation.com/shows/%s/videos/official/%s", showSlug, episodeSlug))
 }
 
 func (f *Client) GetEpisodeFromUrl(episodeUrl string) (*Episode, error) {
