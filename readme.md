@@ -80,7 +80,7 @@ Note: The ellipsis (`...`) means the multiple of the last argument may be added 
 
 `--password <password>` your funimation account password
 
-`--bitrate <bitrate>` the desired video quality to download, 0 = best
+`--quality <quality>` the video quality to download at; either sd, hd, or fhd
 
 `--language <language>` either sub or dub
 
@@ -94,4 +94,4 @@ The `{episode-num}` or `{episode-tag}` may be replace with an asterisk (`*`) to 
 
 ##Upcoming Features
 
-- Improve error message
+- Differentiate regular episodes and OVAs
