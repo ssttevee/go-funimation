@@ -29,6 +29,8 @@ func (w *writerMiddleware) Write(p []byte) (int, error) {
 var funimationClient *funimation.Client
 
 func init() {
+	downloader.TempDir = os.TempDir() + "/.funimation"
+
 	jar, err := cookiejar.New(nil)
 	if err != nil {
 		log.Fatal(err.Error())
@@ -49,11 +51,11 @@ func main() {
 	downloadCmd := flag.NewFlagSet("download", flag.ExitOnError)
 	downloadCmd.String("email", "", "your funimation account email address")
 	downloadCmd.String("password", "", "your funimation account password")
-	downloadCmd.Int("bitrate", 0, "will take the closest `Kbps` bitrate if the given is not available, 0 = best")
+	downloadCmd.String("quality", "max", "quality of the video, `sd, hd, or fhd`")
 	downloadCmd.String("language", funimation.Subbed, "either `sub or dub`")
 	downloadCmd.Bool("url-only", false, "get the url instead of downloading")
 	downloadCmd.Int("threads", 1, "number of threads for multithreaded download")
-	downloadCmd.Bool("enable-url-guessing", false, "guess urls for non-public videos")
+	downloadCmd.Bool("guess", false, "guess urls for non-public videos")
 	downloadCmd.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: funimation download [options] <show> <episode> [<episode>...]")
 		fmt.Fprintln(os.Stderr, "    OR funimation download [options] <show> <episode-nums> [<episode-nums>...]")
@@ -134,8 +136,6 @@ func doDownload(cmd *flag.FlagSet) {
 	}
 
 	episodes := make([]*funimation.Episode, 0)
-
-	funimation.GuessUrls = cmd.Lookup("enable-url-guessing").Value.(flag.Getter).Get().(bool)
 
 	if strings.HasPrefix(show, "http") {
 		for _, url := range cmd.Args() {
@@ -230,10 +230,11 @@ func doDownload(cmd *flag.FlagSet) {
 
 	fmt.Printf("Found %d episodes:\n", len(episodes))
 
-	bitrate := cmd.Lookup("bitrate").Value.(flag.Getter).Get().(int)
+	quality := cmd.Lookup("quality").Value.(flag.Getter).Get().(string)
 	language := funimation.EpisodeLanguage(cmd.Lookup("language").Value.(flag.Getter).Get().(string))
 	urlOnly := cmd.Lookup("url-only").Value.(flag.Getter).Get().(bool)
 	threads := cmd.Lookup("threads").Value.(flag.Getter).Get().(int)
+	guessUrls := cmd.Lookup("guess").Value.(flag.Getter).Get().(bool)
 
 	// default to subbed
 	if language != funimation.Subbed && language != funimation.Dubbed {
@@ -254,8 +255,9 @@ func doDownload(cmd *flag.FlagSet) {
 		}
 
 		// make sure language is available
+		var el funimation.EpisodeLanguage = language
 		if !foundLang {
-			fmt.Printf("Language mode - %s - is unavailable; ", language)
+			fmt.Printf("Language mode - %s - is unavailable; ", el)
 
 			// if subbed is unavailable, something is wrong... just give up...
 			if !hasSub {
@@ -264,37 +266,39 @@ func doDownload(cmd *flag.FlagSet) {
 			}
 
 			fmt.Println("defaulting to sub")
-			language = funimation.Subbed
+			el = funimation.Subbed
 		}
 
-		if bitrate == 0 {
-			bitrate = episode.FixBitrate(bitrate, language)
-			if bitrate == 0 {
-				log.Println("Can't download that episode")
-				continue
-			}
+		var eq funimation.EpisodeQuality
+		if quality == "max" {
+			eq = episode.GetBestQuality(el, !guessUrls)
+		} else {
+			eq = funimation.ParseEpisodeQuality(quality)
 		}
 
-		assertBitrate(episode, bitrate, language)
+		urlFunc := episode.GetVideoUrl
+		if guessUrls {
+			urlFunc = episode.GuessVideoUrl
+		}
+
+		url, err := urlFunc(el, eq)
+		if err != nil {
+			log.Println("Failed to get url: ", err)
+			continue
+		}
 
 		if urlOnly {
-			url, err := episode.GetMp4Url(bitrate, language)
-			if err != nil {
-				log.Println("Failed to get url: ", err)
-				continue
-			}
-
 			fmt.Printf("Season %d, Episode %v: %s\n", episode.SeasonNumber(), episode.EpisodeNumber(), url)
 			continue
 		}
 
-		dl, err := episode.GetDownloader(bitrate, language)
+		dl, err := downloader.New(url)
 		if err != nil {
 			log.Println("Failed to get downloader: ", err)
 			continue
 		}
 
-		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
+		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), eq.String(), el)
 		fname = strings.Map(func(r rune) (rune) {
 			if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
 				return -1
@@ -368,27 +372,5 @@ func doDownload(cmd *flag.FlagSet) {
 
 			fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(dl.Size())), time.Now().Sub(startTime))
 		}
-	}
-}
-
-func assertBitrate(ep *funimation.Episode, bitrate int, language funimation.EpisodeLanguage) {
-	for _, br := range ep.BitRates(language) {
-		if br == bitrate {
-			return
-		}
-	}
-
-	log.Fatal("That bitrate is unavailable")
-}
-
-func bitrateToQuality(bitRate int) (string) {
-	if bitRate <= 1500 {
-		return "SD"
-	} else if bitRate <= 2500 {
-		return "720p"
-	} else if bitRate <= 4000 {
-		return "1080p"
-	} else {
-		return ""
 	}
 }

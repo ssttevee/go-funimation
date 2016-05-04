@@ -7,17 +7,30 @@ import (
 	"errors"
 	"strconv"
 	"fmt"
-	"github.com/ssttevee/go-downloader"
-	"os"
+	"math/rand"
 )
 var NotFound = errors.New("Not found")
 
+const uaFmt = "Mozilla/%.1f (Linux; %s; Android %.1f.%d; en-us) AppleWebkit/%.2f (KHTML, like Gecko) Version/%.1f Mobile Safari/%.2f"
+var mobileUA string
+
 func init() {
-	downloader.TempDir = os.TempDir() + "/.funimation"
+	RegenerateUA()
 }
 
 type Client struct {
 	httpClient *http.Client
+}
+
+func RegenerateUA() {
+	mobileUA = fmt.Sprintf(uaFmt,
+		rand.Float32() * float32(10), // mozilla version
+		[]string{"N", "U", "I"}[rand.Intn(3)], // security strength
+		rand.Float32() * float32(10), // android major and minor version
+		rand.Intn(10), // android revision number
+		rand.Float32() * float32(1000), // webkit version
+		rand.Float32() * float32(10), // safari version
+		rand.Float32() * float32(1000)) // safari build number
 }
 
 func New(cookieJar *cookiejar.Jar) (*Client) {

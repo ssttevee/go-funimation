@@ -7,11 +7,7 @@ import (
 	"strconv"
 	"bytes"
 	"fmt"
-	"math"
-	"github.com/ssttevee/go-downloader"
 )
-
-var GuessUrls = false
 
 type EpisodeLanguage string
 
@@ -19,6 +15,38 @@ const (
 	Dubbed EpisodeLanguage = "dub"
 	Subbed                 = "sub"
 )
+
+type EpisodeQuality int
+
+const (
+	NoQuality EpisodeQuality = iota
+	StandardDefinition       = iota
+	HighDefinition           = iota
+	FullHighDefinition       = iota
+)
+
+func (q EpisodeQuality) String() string {
+	switch q {
+	case StandardDefinition:
+		return "sd"
+	case HighDefinition:
+		return "hd"
+	case FullHighDefinition:
+		return "fhd"
+	}
+
+	return "none"
+}
+
+func ParseEpisodeQuality(qualityStr string) EpisodeQuality {
+	if qualityStr == "fhd" || qualityStr == "1080p" {
+		return FullHighDefinition
+	} else if qualityStr == "hd" || qualityStr == "720p" {
+		return HighDefinition
+	}
+
+	return StandardDefinition
+}
 
 type EpisodeType string
 
@@ -35,8 +63,7 @@ type Episode struct {
 	title       string
 	summary     string
 
-	languages   []EpisodeLanguage
-	bitRates    map[EpisodeLanguage][]int
+	videoUrls   map[EpisodeLanguage]map[EpisodeQuality]string
 
 	url         string
 
@@ -62,14 +89,49 @@ func (e *Episode) Summary() (string) {
 }
 
 func (e *Episode) Languages() ([]EpisodeLanguage) {
-	return e.languages[:]
+	langs := make([]EpisodeLanguage, 0, len(e.videoUrls))
+
+	for lang, _ := range e.videoUrls {
+		langs = append(langs, lang)
+	}
+
+	return langs
 }
 
-func (e *Episode) BitRates(lang EpisodeLanguage) ([]int) {
-	return e.bitRates[lang][:]
+func (e *Episode) Qualities(lang EpisodeLanguage) ([]EpisodeQuality) {
+	urls := e.videoUrls[lang]
+	qualities := make([]EpisodeQuality, 0, len(urls))
+
+	for quality, _ := range urls {
+		qualities = append(qualities, quality)
+	}
+
+	return qualities
 }
 
-func (e *Episode) GetHLSUrl(bitrate int, lang EpisodeLanguage) (string, error) {
+func (e *Episode) GetVideoUrl(lang EpisodeLanguage, quality EpisodeQuality) (string, error) {
+	if urls, ok := e.videoUrls[lang]; ok {
+		if url, ok := urls[quality]; ok {
+			if url == "subscriptionLoggedOut" {
+				return "", errors.New("This video is members only")
+			} else if url == "matureContentLoggedOut" {
+				return "", errors.New("This video is members only and you must be at least 17")
+			} else if url == "nonSubscription" {
+				return "", errors.New("This video is only available to subscribers")
+			} else if url == "matureContentLoggedIn" {
+				return "", errors.New("You must be at least 17")
+			} else if url == "territoryUnavailable" {
+				return "", errors.New("This video is not available in your territory")
+			}
+
+			return url, nil
+		}
+	}
+
+	return "", errors.New("No videos found with the given language and quality")
+}
+
+func (e *Episode) GuessVideoUrl(lang EpisodeLanguage, quality EpisodeQuality) (string, error) {
 	funId, err := e.getFunimationId(lang)
 	if err != nil {
 		return "", err
@@ -79,22 +141,17 @@ func (e *Episode) GetHLSUrl(bitrate int, lang EpisodeLanguage) (string, error) {
 		return "", errors.New("Couldn't find auth token")
 	}
 
-	bitrate = e.FixBitrate(bitrate, lang)
-
-	return fmt.Sprintf("http://wpc.8c48.edgecastcdn.net/038C48/SV/480/%s/%s-480-%dK.mp4.m3u8%s", funId, funId, bitrate, e.authToken), nil
-}
-
-func (e *Episode) GetMp4Url(bitrate int, lang EpisodeLanguage) (string, error) {
-	funId, err := e.getFunimationId(lang)
-	if err != nil {
-		return "", err
+	if quality == NoQuality {
+		return "", errors.New("Quality cannot be none")
 	}
 
-	if e.authToken == "" {
-		return "", errors.New("Couldn't find auth token")
+	bitrate := 1500
+	switch quality {
+	case HighDefinition:
+		bitrate = 2500
+	case FullHighDefinition:
+		bitrate = 4000
 	}
-
-	bitrate = e.FixBitrate(bitrate, lang)
 
 	return fmt.Sprintf("http://wpc.8c48.edgecastcdn.net/008C48/SV/480/%s/%s-480-%dK.mp4%s", funId, funId, bitrate, e.authToken), nil
 }
@@ -130,8 +187,7 @@ func (e *Episode) collectData() (error) {
 	playerData := playersData[0]
 
 	e.funIds = make(map[EpisodeLanguage]string)
-	e.bitRates = make(map[EpisodeLanguage][]int)
-	e.languages = make([]EpisodeLanguage, 0)
+	e.videoUrls = make(map[EpisodeLanguage]map[EpisodeQuality]string)
 
 	found := false
 	for _, pli := range playerData.playlist {
@@ -213,33 +269,20 @@ func (e *Episode) handlePlaylistItemClip(clip *playlistItemClip) (error) {
 		// collect funimation id
 		e.funIds[language] = video.funimationId
 
-		// collect bitrates
-		e.bitRates[language] = make([]int, 0)
+		// collect video urls
+		urls := make(map[EpisodeQuality]string)
 
-		if GuessUrls {
-			if video.sdUrl != "" {
-				e.bitRates[language] = append(e.bitRates[language], 750, 1500)
-			}
-			if video.hdUrl != "" {
-				e.bitRates[language] = append(e.bitRates[language], 2000, 2500)
-			}
-			if video.hd1080Url != "" {
-				e.bitRates[language] = append(e.bitRates[language], 4000)
-			}
-		} else {
-			if strings.HasPrefix(video.sdUrl, "http") {
-				e.bitRates[language] = append(e.bitRates[language], 750, 1500)
-			}
-			if strings.HasPrefix(video.hdUrl, "http") {
-				e.bitRates[language] = append(e.bitRates[language], 2000, 2500)
-			}
-			if strings.HasPrefix(video.hd1080Url, "http") {
-				e.bitRates[language] = append(e.bitRates[language], 4000)
-			}
+		if video.sdUrl != "" {
+			urls[StandardDefinition] = video.sdUrl
+		}
+		if video.hdUrl != "" {
+			urls[HighDefinition] = video.hdUrl
+		}
+		if video.hd1080Url != "" {
+			urls[FullHighDefinition] = video.hd1080Url
 		}
 
-		// collect languages
-		e.languages = append(e.languages, language)
+		e.videoUrls[language] = urls
 	}
 
 	// collect episode number
@@ -248,45 +291,25 @@ func (e *Episode) handlePlaylistItemClip(clip *playlistItemClip) (error) {
 	return nil
 }
 
-func (e *Episode) GetDownloader(bitRate int, language EpisodeLanguage) (*downloader.Downloader, error) {
-	mp4Url, err := e.GetMp4Url(bitRate, language)
-	if err != nil {
-		return nil, err
-	}
+func (e *Episode) GetBestQuality(el EpisodeLanguage, onlyAvailable bool) EpisodeQuality {
+	quality := NoQuality
 
-	stream, err := downloader.New(mp4Url)
-	if err != nil {
-		return nil, err
-	}
+	if urls, ok := e.videoUrls[el]; ok {
+		for q, url := range urls {
+			if onlyAvailable && !strings.HasPrefix(url, "http") {
+				continue
+			}
 
-	return stream, nil
-}
-
-func (e *Episode) FixBitrate(bitrate int, lang EpisodeLanguage) (int) {
-	if bitrate == 0 {
-		for _, br := range e.bitRates[lang] {
-			if br > bitrate {
-				bitrate = br
+			if (q == StandardDefinition && quality != NoQuality) || (q == HighDefinition && quality != NoQuality && quality != StandardDefinition) {
+				quality = q
+			} else if q == FullHighDefinition {
+				quality = q
+				break
 			}
 		}
-
-		return bitrate
-	} else {
-		for _, br := range e.bitRates[lang] {
-			if br == bitrate {
-				return bitrate
-			}
-		}
-
-		closest := bitrate
-		for _, br := range e.bitRates[lang] {
-			if math.Abs(float64(bitrate - closest)) > math.Abs(float64(bitrate - br)) {
-				closest = br
-			}
-		}
-
-		return closest
 	}
+
+	return quality
 }
 
 type EpisodeList []*Episode
@@ -307,12 +330,25 @@ func (e EpisodeList) String() (string) {
 
 	for seasonNum, episodes := range seasons {
 		fmt.Fprintln(buf)
-		fmt.Fprintln(buf, fmt.Sprintf("Season %d:", seasonNum))
+		fmt.Fprintf(buf, "Season %d:\n", seasonNum)
 
 		for _, ep := range episodes {
-			fmt.Fprintln(buf, fmt.Sprintf("  Episode %v - %s", ep.episodeNum, ep.title))
-			fmt.Fprintln(buf, fmt.Sprintf("    Bitrates: %v", ep.bitRates))
-			fmt.Fprintln(buf, fmt.Sprintf("    Language Modes: %v", ep.languages))
+			fmt.Fprintf(buf, "\tEpisode %v - %s\n", ep.episodeNum, ep.title)
+
+			for lang, _ := range ep.videoUrls {
+				fmt.Fprintf(buf, "\t\t%sbed: ", lang)
+
+				if qs := ep.Qualities(lang); len(qs) > 0 {
+					qNames := make([]string, len(qs))
+					for i, q := range qs {
+						qNames[i] = q.String()
+					}
+
+					fmt.Fprintln(buf, strings.Join(qNames, ", "))
+				} else {
+					fmt.Fprintln(buf, NoQuality.String())
+				}
+			}
 		}
 	}
 
