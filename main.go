@@ -100,12 +100,12 @@ func main() {
 func doList(show string) {
 	series, err := funimationClient.GetSeries(show)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to get series: ", err)
 	}
 
 	episodes, err := series.GetAllEpisodes()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Failed to get episodes: ", err)
 	}
 
 	fmt.Println(series.Title())
@@ -129,31 +129,28 @@ func doDownload(cmd *flag.FlagSet) {
 		}
 
 		if err := funimationClient.Login(email, password); err != nil {
-			log.Fatal("login: ", err)
+			log.Fatal("Login failed: ", err)
 		}
 	}
 
 	episodes := make([]*funimation.Episode, 0)
-	getEpisode := func(f func() (*funimation.Episode, error)) {
-		episode, err := f()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		episodes = append(episodes, episode)
-	}
 
 	funimation.GuessUrls = cmd.Lookup("enable-url-guessing").Value.(flag.Getter).Get().(bool)
 
 	if strings.HasPrefix(show, "http") {
 		for _, url := range cmd.Args() {
 			if !strings.HasPrefix(url[strings.Index(url, "://"):], "://www.funimation.com/shows/") {
-				log.Fatal("Only funimation show urls are allowed")
+				log.Println("Only funimation show urls are allowed")
+				continue
 			}
 
-			getEpisode(func() (*funimation.Episode, error) {
-				return funimationClient.GetEpisodeFromUrl(url)
-			})
+			episode, err := funimationClient.GetEpisodeFromUrl(url)
+			if err != nil {
+				log.Println("Failed to get episode: ", err)
+				continue
+			}
+
+			episodes = append(episodes, episode)
 		}
 	} else {
 		var series *funimation.Series
@@ -161,12 +158,12 @@ func doDownload(cmd *flag.FlagSet) {
 			// not a show number, assume it is a show slug
 			series, err = funimationClient.GetSeries(show)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal("Failed to get series: ", err)
 			}
 		} else {
 			series, err = funimationClient.GetSeriesById(int(showNum))
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal("Failed to get series: ", err)
 			}
 		}
 
@@ -174,7 +171,8 @@ func doDownload(cmd *flag.FlagSet) {
 			arg := cmd.Arg(i)
 			if arg == "*" {
 				if eps, err := series.GetAllEpisodes(); err != nil {
-					log.Fatal(err)
+					log.Println("Failed to get all episodes: ", err)
+					continue
 				} else {
 					episodes = eps
 					break
@@ -182,33 +180,45 @@ func doDownload(cmd *flag.FlagSet) {
 			} else if strings.ContainsRune(arg, '-') {
 				startEnd := strings.Split(arg, "-")
 				if len(startEnd) != 2 {
-					log.Fatalf("Range value `%s` must contain 1 dash character", arg)
+					log.Printf("Range value `%s` must contain 1 dash character\n", arg)
+					continue
 				}
 
 				start, err := strconv.ParseInt(startEnd[0], 10, 32)
 				if err != nil {
-					log.Fatal("Range value must be numeric")
+					log.Println("Range value must be numeric")
+					continue
 				}
 
 				end, err := strconv.ParseInt(startEnd[1], 10, 32)
 				if err != nil {
-					log.Fatal("Range value must be numeric")
+					log.Println("Range value must be numeric")
+					continue
 				}
 
 				eps, err := series.GetEpisodesRange(int(start), int(end))
 				if err != nil {
-					log.Fatal(err)
+					log.Println(err)
+					continue
 				}
 
 				episodes = append(episodes, eps...)
 			} else if epNum, err := strconv.ParseInt(arg, 10, 32); err != nil {
-				getEpisode(func() (*funimation.Episode, error) {
-					return series.GetEpisodeBySlug(arg)
-				})
+				episode, err := series.GetEpisodeBySlug(arg)
+				if err != nil {
+					log.Println("Failed to get episode: ", err)
+					continue
+				}
+
+				episodes = append(episodes, episode)
 			} else {
-				getEpisode(func() (*funimation.Episode, error) {
-					return series.GetEpisode(int(epNum))
-				})
+				episode, err := series.GetEpisode(int(epNum))
+				if err != nil {
+					log.Println("Failed to get episode: ", err)
+					continue
+				}
+
+				episodes = append(episodes, episode)
 			}
 		}
 	}
@@ -249,8 +259,8 @@ func doDownload(cmd *flag.FlagSet) {
 
 			// if subbed is unavailable, something is wrong... just give up...
 			if !hasSub {
-				log.Fatal("exiting...")
-				os.Exit(2)
+				log.Println("skipping...")
+				continue
 			}
 
 			fmt.Println("defaulting to sub")
@@ -260,7 +270,8 @@ func doDownload(cmd *flag.FlagSet) {
 		if bitrate == 0 {
 			bitrate = episode.FixBitrate(bitrate, language)
 			if bitrate == 0 {
-				log.Fatal("Can't download that episode")
+				log.Println("Can't download that episode")
+				continue
 			}
 		}
 
@@ -269,7 +280,8 @@ func doDownload(cmd *flag.FlagSet) {
 		if urlOnly {
 			url, err := episode.GetMp4Url(bitrate, language)
 			if err != nil {
-				log.Fatal("get url: ", err)
+				log.Println("Failed to get url: ", err)
+				continue
 			}
 
 			fmt.Printf("Season %d, Episode %v: %s\n", episode.SeasonNumber(), episode.EpisodeNumber(), url)
@@ -278,7 +290,8 @@ func doDownload(cmd *flag.FlagSet) {
 
 		dl, err := episode.GetDownloader(bitrate, language)
 		if err != nil {
-			log.Fatal("get stream: ", err)
+			log.Println("Failed to get downloader: ", err)
+			continue
 		}
 
 		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), bitrateToQuality(bitrate), language)
@@ -346,10 +359,11 @@ func doDownload(cmd *flag.FlagSet) {
 
 		fmt.Println()
 		if d, err = dl.Download(fname, threads); err != nil {
-			log.Fatal("download: ", err)
+			log.Println("Failed to start download: ", err)
 		} else {
 			if err := d.Wait(); err != nil {
-				log.Fatal("wait: ", err)
+				log.Println("\nDownload failed: ", err)
+				continue
 			}
 
 			fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(dl.Size())), time.Now().Sub(startTime))
