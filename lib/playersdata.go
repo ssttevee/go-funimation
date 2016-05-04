@@ -65,7 +65,14 @@ func getPlayersDataFromUrl(client *http.Client, url string) ([]*playerData, erro
 		return nil, errors.New("Url not supported: " + url)
 	}
 
-	res, err := client.Get(url)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Set("User-Agent", mobileUA)
+
+	res, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
