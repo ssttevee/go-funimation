@@ -298,7 +298,7 @@ func doDownload(cmd *flag.FlagSet) {
 			continue
 		}
 
-		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), eq.String(), el)
+		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), qualityToProgressiveLines(eq), el)
 		fname = strings.Map(func(r rune) (rune) {
 			if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
 				return -1
@@ -373,4 +373,16 @@ func doDownload(cmd *flag.FlagSet) {
 			fmt.Printf("\nDownloaded %s in %v\n", humanize.Bytes(uint64(dl.Size())), time.Now().Sub(startTime))
 		}
 	}
+}
+
+func qualityToProgressiveLines(EpisodeQuality q) string {
+	if q == funimation.StandardDefinition {
+		return "480p"
+	} else if q == funimation.HighDefinition {
+		return "720p"
+	} else if q == funimation.FullHighDefinition {
+		return "1080p"
+	}
+
+	return "?"
 }
