@@ -375,7 +375,7 @@ func doDownload(cmd *flag.FlagSet) {
 	}
 }
 
-func qualityToProgressiveLines(EpisodeQuality q) string {
+func qualityToProgressiveLines(q funimation.EpisodeQuality) string {
 	if q == funimation.StandardDefinition {
 		return "480p"
 	} else if q == funimation.HighDefinition {
