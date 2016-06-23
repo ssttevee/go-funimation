@@ -28,11 +28,11 @@ const (
 func (q EpisodeQuality) String() string {
 	switch q {
 	case StandardDefinition:
-		return "sd"
+		return "480p"
 	case HighDefinition:
-		return "hd"
+		return "720p"
 	case FullHighDefinition:
-		return "fhd"
+		return "1080p"
 	}
 
 	return "none"
