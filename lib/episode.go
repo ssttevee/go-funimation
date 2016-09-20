@@ -20,9 +20,9 @@ type EpisodeQuality int
 
 const (
 	NoQuality EpisodeQuality = iota
-	StandardDefinition       = iota
-	HighDefinition           = iota
-	FullHighDefinition       = iota
+	StandardDefinition
+	HighDefinition
+	FullHighDefinition
 )
 
 func (q EpisodeQuality) String() string {
@@ -53,6 +53,7 @@ type EpisodeType string
 const (
 	Regular EpisodeType = "Episode"
 	Ova                 = "OVA"
+	Special             = "Special"
 )
 
 type Episode struct {
@@ -78,6 +79,16 @@ func (e *Episode) SeasonNumber() (int) {
 
 func (e *Episode) EpisodeNumber() (float32) {
 	return e.episodeNum
+}
+
+func (e *Episode) TypeCode() string {
+	if e.episodeType == Ova {
+		return "o"
+	} else if e.episodeType == Special {
+		return "special"
+	}
+
+	return "e"
 }
 
 func (e *Episode) Title() (string) {
@@ -315,7 +326,7 @@ func (e *Episode) GetBestQuality(el EpisodeLanguage, onlyAvailable bool) Episode
 type EpisodeList []*Episode
 
 func (e EpisodeList) String() (string) {
-	buf := &bytes.Buffer{}
+	var buf bytes.Buffer
 
 	seasons := make(map[int]EpisodeList)
 	for _, ep := range e {
@@ -326,17 +337,20 @@ func (e EpisodeList) String() (string) {
 		seasons[ep.seasonNum] = append(seasons[ep.seasonNum], ep)
 	}
 
-	fmt.Fprintln(buf, fmt.Sprintf("%d Seasons, %d Episodes", len(seasons), len(e)))
+	fmt.Fprintln(&buf, fmt.Sprintf("%d Seasons, %d Episodes", len(seasons), len(e)))
 
 	for seasonNum, episodes := range seasons {
-		fmt.Fprintln(buf)
-		fmt.Fprintf(buf, "Season %d:\n", seasonNum)
+		fmt.Fprintf(&buf, "\nSeason %d:\n", seasonNum)
 
 		for _, ep := range episodes {
-			fmt.Fprintf(buf, "\tEpisode %v - %s\n", ep.episodeNum, ep.title)
+			if ep.episodeNum == 0 {
+				fmt.Fprintf(&buf, "\t%s - %s\n", ep.episodeType, ep.title)
+			} else {
+				fmt.Fprintf(&buf, "\t%s %v - %s\n", ep.episodeType, ep.episodeNum, ep.title)
+			}
 
-			for lang, _ := range ep.videoUrls {
-				fmt.Fprintf(buf, "\t\t%sbed: ", lang)
+			for lang := range ep.videoUrls {
+				fmt.Fprintf(&buf, "\t\t%sbed: ", lang)
 
 				if qs := ep.Qualities(lang); len(qs) > 0 {
 					qNames := make([]string, len(qs))
@@ -344,9 +358,9 @@ func (e EpisodeList) String() (string) {
 						qNames[i] = q.String()
 					}
 
-					fmt.Fprintln(buf, strings.Join(qNames, ", "))
+					fmt.Fprintln(&buf, strings.Join(qNames, ", "))
 				} else {
-					fmt.Fprintln(buf, NoQuality.String())
+					fmt.Fprintln(&buf, NoQuality.String())
 				}
 			}
 		}

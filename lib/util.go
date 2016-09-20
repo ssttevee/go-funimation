@@ -8,7 +8,10 @@ import (
 	"fmt"
 	"strings"
 	"golang.org/x/net/html"
+	"sync"
 )
+
+var collectCookies sync.Once
 
 func getJsonObject(client *http.Client, url string) (map[string]interface{}, error) {
 	res, err := client.Get(url)
@@ -32,23 +35,25 @@ func getJsonObject(client *http.Client, url string) (map[string]interface{}, err
 }
 
 func searchForEpisodes(client *http.Client, showId, limit, offset int) ([]*Episode, error) {
-	episodes := make([]*Episode, 0)
+	// collect cookies for the first time
+	collectCookies.Do(func() {
+		client.Get("http://www.funimation.com/videos/episodes")
+	})
+
+	var episodes []*Episode
 
 	searchUrl := fmt.Sprintf("http://www.funimation.com/shows/viewAllFiltered?section=episodes&limit=%d&offset=%d&showid=%d", limit, offset, showId)
 	ajax, err := getJsonObject(client, searchUrl)
 	if err != nil {
-		client.Get("http://www.funimation.com/videos/episodes")
-		// ignore response
-
-		ajax, err = getJsonObject(client, searchUrl)
-		if err != nil {
-			return nil, err
-		}
+		return nil, err
 	}
 
 	tokenizer := html.NewTokenizer(strings.NewReader(ajax["main"].(string)))
 
 	errChan := make(chan error)
+
+	var lookForEpisodeType bool
+	var prevEpisode *Episode
 	for {
 		tokenType := tokenizer.Next()
 
@@ -64,6 +69,7 @@ func searchForEpisodes(client *http.Client, showId, limit, offset int) ([]*Episo
 					if attr.Key == "class" {
 						if strings.Contains(attr.Val, "watchLinks") {
 							foundWatchLink = true
+							lookForEpisodeType = true
 						}
 					} else if attr.Key == "href" {
 						href = attr.Val
@@ -74,13 +80,30 @@ func searchForEpisodes(client *http.Client, showId, limit, offset int) ([]*Episo
 					ep := &Episode{
 						client: client,
 						url: href,
-					}
+						episodeType: Regular}
 
 					episodes = append(episodes, ep)
 
 					go func() {
 						errChan<- ep.collectData()
 					}()
+
+					prevEpisode = ep
+				}
+			}
+		} else if lookForEpisodeType {
+			token := tokenizer.Token()
+
+			if tokenType == html.EndTagToken && token.Data == "a" {
+				lookForEpisodeType = false;
+			} else if tokenType == html.TextToken {
+				text := strings.ToLower(token.Data)
+				if strings.Contains(text, "episode") {
+					lookForEpisodeType = false;
+				} else if strings.Contains(text, "ova") {
+					prevEpisode.episodeType = Ova
+				} else if strings.Contains(text, "special") {
+					prevEpisode.episodeType = Special
 				}
 			}
 		}

@@ -298,7 +298,14 @@ func doDownload(cmd *flag.FlagSet) {
 			continue
 		}
 
-		fname := fmt.Sprintf("s%de%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.EpisodeNumber(), episode.Title(), eq.String(), el)
+		var epnum interface{}
+		if episode.EpisodeNumber() == 0 {
+			epnum = ""
+		} else {
+			epnum = episode.EpisodeNumber()
+		}
+
+		fname := fmt.Sprintf("s%d%s%v - %s [%s][%s].mp4", episode.SeasonNumber(), episode.TypeCode(), epnum, episode.Title(), eq.String(), el)
 		fname = strings.Map(func(r rune) (rune) {
 			if r == '\\' || r == '/' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
 				return -1
