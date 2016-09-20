@@ -28,7 +28,7 @@ Download one of the prebuilt executables, and extract it to somewhere that is in
 
 ###Terminology
 
-The `{video-url}` is the url of an episode
+The `{episode-url}` is the url of an episode
 
 The `{series-num}` is the id of a series, arbitrarily assigned by funimation (not publicly visible)
 
@@ -39,7 +39,7 @@ The `{series-tag}` is the url slug of a series
 The `{episode-tag}` is the url slug of an episode in a series
 
 ####Clarification
-Given the following `{video-url}`: `http://www.funimation.com/shows/steins-gate/videos/official/turning-point`
+Given the following `{episode-url}`: `http://www.funimation.com/shows/steins-gate/videos/official/turning-point`
 
 The `{series-tag}` is _steins-gate_
 
@@ -60,7 +60,7 @@ funimation list {series-tag}
 Download one or more episodes of a series
 
 ```
-funimation download [options] {video-url} ...
+funimation download [options] {episode-url} ...
 ```
 ```
 funimation download [options] {series-tag} {episode-tag} ...
@@ -76,17 +76,17 @@ Note: The ellipsis (`...`) means the multiple of the last argument may be added 
 
 #####Options
 
-`--email <email address>` your funimation account email address
+`-email <email address>` your funimation account email address
 
-`--password <password>` your funimation account password
+`-password <password>` your funimation account password
 
-`--quality <quality>` the video quality to download at; either sd, hd, or fhd
+`-quality <quality>` the video quality to download at; either sd, hd, or fhd (default "max")
 
-`--language <language>` either sub or dub
+`-language <language>` either sub or dub
 
-`--url-only` shows the url instead of downloading it
+`-url-only` shows the url instead of downloading it
 
-`--threads <threads>` the number of threads for a multithreaded download
+`-threads <threads>` the number of threads for a multithreaded download
 
 ###Batching
 
