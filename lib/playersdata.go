@@ -290,7 +290,7 @@ func formatPlaylistItemClip(m map[string]interface{}) (playlistItem, error) {
 		return nil, NotFound
 	}
 
-	if n, ok := m["number"]; ok {
+	if n, ok := m["number"]; ok && n != nil {
 		num, err := strconv.ParseFloat(n.(string), 32)
 		if err != nil {
 			return nil, err
