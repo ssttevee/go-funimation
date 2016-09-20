@@ -1,4 +1,4 @@
-package funimation
+package funimation // import "golang.ssttevee.com/funimation/lib"
 
 import (
 	"net/http/cookiejar"

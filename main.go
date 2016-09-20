@@ -1,8 +1,8 @@
-package main
+package main // import "golang.ssttevee.com/funimation"
 
 import (
 	"fmt"
-	"github.com/ssttevee/funimation/lib"
+	"golang.ssttevee.com/funimation/lib"
 	"net/http/cookiejar"
 	"log"
 	"io"
