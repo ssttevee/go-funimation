@@ -288,7 +288,7 @@ func doDownload(cmd *flag.FlagSet) {
 		}
 
 		if urlOnly {
-			fmt.Printf("Season %d, Episode %v: %s\n", episode.SeasonNumber(), episode.EpisodeNumber(), url)
+			fmt.Printf("Season %d, %s %v: %s\n", episode.SeasonNumber(), episode.Type(), episode.EpisodeNumber(), url)
 			continue
 		}
 
@@ -313,7 +313,7 @@ func doDownload(cmd *flag.FlagSet) {
 			return r
 		}, fname)
 
-		fmt.Printf("\nDownloading %s Season %d - Episode %v\n", episode.Title(), episode.SeasonNumber(), episode.EpisodeNumber())
+		fmt.Printf("\nDownloading %s Season %d - %s %v\n", episode.Title(), episode.SeasonNumber(), episode.Type(), episode.EpisodeNumber())
 		fmt.Printf("Saving to: %s\n\n", fname)
 
 		startTime := time.Now()

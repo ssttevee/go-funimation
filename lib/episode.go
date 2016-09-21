@@ -81,6 +81,10 @@ func (e *Episode) EpisodeNumber() (float32) {
 	return e.episodeNum
 }
 
+func (e *Episode) Type() string {
+	return e.episodeType
+}
+
 func (e *Episode) TypeCode() string {
 	if e.episodeType == Ova {
 		return "o"
