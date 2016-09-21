@@ -82,7 +82,7 @@ func (e *Episode) EpisodeNumber() (float32) {
 }
 
 func (e *Episode) Type() string {
-	return e.episodeType
+	return string(e.episodeType)
 }
 
 func (e *Episode) TypeCode() string {
