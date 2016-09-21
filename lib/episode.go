@@ -315,11 +315,8 @@ func (e *Episode) GetBestQuality(el EpisodeLanguage, onlyAvailable bool) Episode
 				continue
 			}
 
-			if (q == StandardDefinition && quality != NoQuality) || (q == HighDefinition && quality != NoQuality && quality != StandardDefinition) {
+			if q > quality {
 				quality = q
-			} else if q == FullHighDefinition {
-				quality = q
-				break
 			}
 		}
 	}
