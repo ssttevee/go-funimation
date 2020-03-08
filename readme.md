@@ -1,8 +1,10 @@
-#Funimation Downloader
+Note: This method no longer works since Funimation [updated their website](https://www.funimation.com/blog/2016/09/23/funimationnow-discover-an-extraordinary-user-experience/) in October 2016
+
+# Funimation Downloader
 
 Download videos from funimation!
 
-##Basic Usage
+## Basic Usage
 
 The following command will download the first episode of **Steins; Gate** at the highest quality that is publicly viewable
 
@@ -10,9 +12,9 @@ The following command will download the first episode of **Steins; Gate** at the
 funimation download steins-gate 1
 ```
 
-##Installation
+## Installation
 
-###Via `go get`
+### Via `go get`
 
 In your command line, with the latest version of go installed, you can simply use the following command:
 
@@ -20,11 +22,11 @@ In your command line, with the latest version of go installed, you can simply us
 go get golang.ssttevee.com/funimation
 ```
 
-###Manual Install
+### anual Install
 
 Download one of the prebuilt executables, and extract it to somewhere that is in your environment path variable
 
-##Advanced Usage
+## Advanced Usage
 
 ###Terminology
 
@@ -38,16 +40,16 @@ The `{series-tag}` is the url slug of a series
 
 The `{episode-tag}` is the url slug of an episode in a series
 
-####Clarification
+#### Clarification
 Given the following `{episode-url}`: `http://www.funimation.com/shows/steins-gate/videos/official/turning-point`
 
 The `{series-tag}` is _steins-gate_
 
 The `{episode-tag}` is _turning-point_
 
-###Command Variants
+### Command Variants
 
-####List
+#### List
 
 Lists every episode in the series as well as their language and bitrate availability
 
@@ -55,7 +57,7 @@ Lists every episode in the series as well as their language and bitrate availabi
 funimation list {series-tag}
 ```
 
-####Download
+#### Download
 
 Download one or more episodes of a series
 
@@ -74,7 +76,7 @@ funimation download [options] {series-num} {episode-num} ...
 
 Note: The ellipsis (`...`) means the multiple of the last argument may be added to the end to download multiple episodes consecutively
 
-#####Options
+##### Options
 
 `-email <email address>` your funimation account email address
 
@@ -88,6 +90,6 @@ Note: The ellipsis (`...`) means the multiple of the last argument may be added 
 
 `-threads <threads>` the number of threads for a multithreaded download
 
-###Batching
+### Batching
 
 The `{episode-num}` or `{episode-tag}` may be replace with an asterisk (`*`) to download all episodes in a series as well as a range of episodes (i.e. `1-4` or `6-24`).
